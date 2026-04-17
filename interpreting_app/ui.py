@@ -4,42 +4,48 @@ import streamlit as st
 
 from interpreting_app.audio_ai import transcribe_audio_bytes
 from interpreting_app.config import (
+    DEEPSEEK_BASE_URL,
+    DEEPSEEK_TEXT_MODEL,
     SILICON_STT_ENDPOINT,
     SILICON_STT_MODEL,
-    SILICON_TEXT_BASE_URL,
-    SILICON_TEXT_MODEL,
 )
 from interpreting_app.llm import normalize_api_key, sanitize_error, test_text_model
 
 
 def render_sidebar() -> Dict:
-    st.sidebar.header("硅基流动模型配置")
-    st.sidebar.caption("本版本统一使用硅基流动：SenseVoice 转写 + Qwen 文本模型")
+    st.sidebar.header("模型配置")
+    st.sidebar.caption("文本任务：DeepSeek；语音转写：SiliconFlow")
 
+    st.sidebar.subheader("文本模型（DeepSeek）")
+    deepseek_api_key = st.sidebar.text_input(
+        "DeepSeek API Key",
+        type="password",
+        help="用于文本翻译与源语重述",
+    )
+    deepseek_base_url = st.sidebar.text_input("DeepSeek Base URL", value=DEEPSEEK_BASE_URL)
+    deepseek_model = st.sidebar.text_input("DeepSeek Model", value=DEEPSEEK_TEXT_MODEL)
+
+    st.sidebar.subheader("语音模型（SiliconFlow）")
     api_key = st.sidebar.text_input(
         "SiliconFlow API Key",
         type="password",
         help="必须填写 key，系统不会硬编码密钥",
-        value = "sk-rduieyculdtrbmfropfflztfhxufshlalqlhskgyqpcdlwit", # 方便测试，正式使用请替换为自己的 key
     )
     st.sidebar.caption("安全提示：不要把 API Key 写入代码或提交到仓库。")
-
-    text_base_url = st.sidebar.text_input("文本模型 Base URL", value=SILICON_TEXT_BASE_URL)
-    text_model = st.sidebar.text_input("文本模型（Qwen）", value=SILICON_TEXT_MODEL)
     stt_endpoint = st.sidebar.text_input("语音转写 Endpoint", value=SILICON_STT_ENDPOINT)
     stt_model = st.sidebar.text_input("语音转写模型", value=SILICON_STT_MODEL)
 
     if st.sidebar.button("测试文本模型连通性", use_container_width=True):
         try:
             reply = test_text_model(
-                api_key=normalize_api_key(api_key),
-                base_url=text_base_url.strip(),
-                model=text_model.strip(),
+                api_key=normalize_api_key(deepseek_api_key),
+                base_url=deepseek_base_url.strip(),
+                model=deepseek_model.strip(),
             )
             st.session_state["text_test_reply"] = reply
             st.sidebar.success("模型连通性正常。")
         except Exception as exc:
-            st.sidebar.error(f"连通性测试失败：{sanitize_error(exc, api_key)}")
+            st.sidebar.error(f"连通性测试失败：{sanitize_error(exc, deepseek_api_key)}")
 
     if st.sidebar.button("测试语音模型连通性", use_container_width=True):
         uploaded = st.session_state.get("uploaded_audio_for_test")
@@ -66,9 +72,10 @@ def render_sidebar() -> Dict:
         st.session_state["show_history"] = True
 
     return {
-        "api_key": api_key,
-        "text_base_url": text_base_url,
-        "text_model": text_model,
+        "deepseek_api_key": deepseek_api_key,
+        "deepseek_base_url": deepseek_base_url,
+        "deepseek_model": deepseek_model,
+        "silicon_api_key": api_key,
         "stt_endpoint": stt_endpoint,
         "stt_model": stt_model,
     }

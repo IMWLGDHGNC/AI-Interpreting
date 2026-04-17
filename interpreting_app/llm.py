@@ -23,19 +23,35 @@ def sanitize_error(exc: Exception, api_key: str) -> str:
     return msg
 
 
-def call_qwen_chat(api_key: str, base_url: str, model: str, system_prompt: str, user_prompt: str) -> str:
-    client = OpenAI(api_key=api_key, base_url=base_url.strip())
+def call_text_chat(
+    api_key: str,
+    base_url: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> str:
+    if not api_key.strip():
+        raise ValueError("DeepSeek API Key 不能为空。")
+
+    client = OpenAI(
+        api_key=api_key.strip(),
+        base_url=base_url.strip().rstrip("/"),
+    )
     completion = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        extra_body={"enable_thinking": False},
         temperature=0.4,
-        
     )
-    return completion.choices[0].message.content.strip()
+
+    if completion.choices and completion.choices[0].message:
+        content = completion.choices[0].message.content or ""
+        if content.strip():
+            return content.strip()
+
+    raise ValueError("DeepSeek 返回为空，无法解析文本结果。")
 
 
 def translate_text(
@@ -59,7 +75,7 @@ def translate_text(
             "只输出译文，不要解释。\n"
             f"原文：{text}"
         )
-    return call_qwen_chat(
+    return call_text_chat(
         api_key=api_key,
         base_url=base_url,
         model=model,
@@ -71,11 +87,13 @@ def translate_text(
 def paraphrase_text(api_key: str, base_url: str, model: str, text: str, language: str) -> str:
     user_prompt = (
         "请对下面内容做同语言同义重述。"
+        "源语重述要求用同一种语言，对说话的主要内容进行简洁重述，可以使用不同的表达方式，但必须保持原意不变，只需要概括主要内容，在几句话之内完成。"
         "仅输出重述结果，不要解释。\n"
+        "例子：原文：'Despite the fact that the team had conducted multiple rounds of rigorous testing and had not encountered any significant issues during the entire development phase, the product still failed catastrophically within the first few hours of its official launch due to an unforeseen interaction between two seemingly unrelated software modules.\n'输出：'An unexpected software conflict caused the product to fail immediately after launch, even though earlier tests had shown no major problems.'\n"
         f"语言：{language}\n"
         f"原文：{text}"
     )
-    return call_qwen_chat(
+    return call_text_chat(
         api_key=api_key,
         base_url=base_url,
         model=model,
@@ -85,7 +103,7 @@ def paraphrase_text(api_key: str, base_url: str, model: str, text: str, language
 
 
 def test_text_model(api_key: str, base_url: str, model: str) -> str:
-    return call_qwen_chat(
+    return call_text_chat(
         api_key=api_key,
         base_url=base_url,
         model=model,
@@ -101,18 +119,15 @@ def generate_llm_answer(
     mode: str,
     material: Dict,
 ) -> str:
-    normalized_key = normalize_api_key(api_key)
-    if not normalized_key:
-        raise ValueError("请先填写 API Key（必须使用 key 才能调用模型）。")
     if not base_url.strip():
-        raise ValueError("Base URL 不能为空。")
+        raise ValueError("DeepSeek Base URL 不能为空。")
     if not model.strip():
-        raise ValueError("Model 不能为空。")
+        raise ValueError("DeepSeek Model 不能为空。")
 
     text = material["source_text"]
     if mode == "双语转换":
         return translate_text(
-            api_key=normalized_key,
+            api_key=api_key,
             base_url=base_url.strip(),
             model=model.strip(),
             text=text,
@@ -121,7 +136,7 @@ def generate_llm_answer(
 
     language = material.get("language", "中文")
     return paraphrase_text(
-        api_key=normalized_key,
+        api_key=api_key,
         base_url=base_url.strip(),
         model=model.strip(),
         text=text,

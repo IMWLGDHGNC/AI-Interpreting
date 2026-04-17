@@ -26,10 +26,21 @@ from interpreting_app.repository import (
 from interpreting_app.ui import render_history_panel, render_sidebar
 
 
+def sanitize_with_keys(exc: Exception, keys: list[str]) -> str:
+    msg = str(exc)
+    for key in keys:
+        msg = sanitize_error(Exception(msg), key)
+    return msg
+
+
 def main() -> None:
     st.set_page_config(page_title="AI+口译训练平台", layout="wide")
-    st.title("AI+口译训练平台（课程作业版）")
-    st.caption("支持：素材训练、上传音频转写、中英互译、源语重述与历史记录")
+    st.title("AI+口译训练平台")
+    st.markdown("这是一个利用大模型辅助大学生进行英语口译训练的工具，它调用两个模型接口：DeepSeek 生成文本答案，Silicon STT 进行语音转写。")
+    st.markdown("它支持自主选择难度，从素材库中抓取训练素材进行练习；也支持自主上传语音进行练习。")
+    st.markdown("它支持数据的持久化，用户可以保存训练记录并随时查看历史记录。")
+    st.markdown("开发者正在想办法压低成本。")
+    
 
     ensure_storage()
     materials = load_materials()
@@ -37,7 +48,7 @@ def main() -> None:
 
     top_left, top_right = st.columns([3, 1])
     with top_right:
-        if st.button("打开历史记录", use_container_width=True):
+        if st.button("打开历史记录", use_container_width=True,):
             st.session_state["show_history"] = True
 
     if st.session_state.get("show_history"):
@@ -84,16 +95,18 @@ def main() -> None:
                 if st.button("调用大模型生成参考", use_container_width=True):
                     try:
                         llm_answer = generate_llm_answer(
-                            api_key=model_cfg["api_key"],
-                            model=model_cfg["text_model"],
-                            base_url=model_cfg["text_base_url"],
+                            api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                            model=model_cfg["deepseek_model"],
+                            base_url=model_cfg["deepseek_base_url"],
                             mode=mode,
                             material=current,
                         )
                         st.session_state["llm_answer"] = llm_answer
                         st.success("模型调用成功。")
                     except Exception as exc:
-                        st.error(f"模型调用失败：{sanitize_error(exc, model_cfg['api_key'])}")
+                        st.error(
+                            f"模型调用失败：{sanitize_with_keys(exc, [model_cfg['deepseek_api_key']])}"
+                        )
 
             with c3:
                 if st.button("保存到历史记录", use_container_width=True):
@@ -145,7 +158,7 @@ def main() -> None:
 
             if run_stt or run_translate or run_paraphrase:
                 try:
-                    key = normalize_api_key(model_cfg["api_key"])
+                    key = normalize_api_key(model_cfg["silicon_api_key"])
                     transcript = transcribe_audio_bytes(
                         api_key=key,
                         endpoint=model_cfg["stt_endpoint"],
@@ -160,9 +173,9 @@ def main() -> None:
 
                     if run_translate:
                         translated = translate_text(
-                            api_key=key,
-                            base_url=model_cfg["text_base_url"],
-                            model=model_cfg["text_model"],
+                            api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                            base_url=model_cfg["deepseek_base_url"],
+                            model=model_cfg["deepseek_model"],
                             text=transcript,
                             direction=direction,
                         )
@@ -172,16 +185,20 @@ def main() -> None:
                     if run_paraphrase:
                         language = "English" if direction == "英文 -> 中文" else "中文"
                         paraphrased = paraphrase_text(
-                            api_key=key,
-                            base_url=model_cfg["text_base_url"],
-                            model=model_cfg["text_model"],
+                            api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                            base_url=model_cfg["deepseek_base_url"],
+                            model=model_cfg["deepseek_model"],
                             text=transcript,
                             language=language,
                         )
                         st.markdown("### 重述结果")
                         st.write(paraphrased)
                 except Exception as exc:
-                    st.error(f"处理失败：{sanitize_error(exc, model_cfg['api_key'])}")
+                    masked = sanitize_with_keys(
+                        exc,
+                        [model_cfg["silicon_api_key"], model_cfg["deepseek_api_key"]],
+                    )
+                    st.error(f"处理失败：{masked}")
         else:
             st.info("先上传音频后再执行转写/翻译。")
 
@@ -189,6 +206,10 @@ def main() -> None:
             st.caption(f"最近一次文本连通性测试返回：{st.session_state['text_test_reply']}")
         if st.session_state.get("stt_test_reply"):
             st.caption(f"最近一次语音连通性测试转写：{st.session_state['stt_test_reply'][:120]}")
+
+    st.markdown("---")
+    st.caption("© 2026 Daniel")
+    st.caption("Design, implementation, testing, and deployment")
 
 
 if __name__ == "__main__":

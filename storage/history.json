@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "time": "2026-04-18 00:00:19",
+    "mode": "源语重述",
+    "difficulty": "初级",
+    "material_id": "pa_beg_en_001",
+    "topic": "daily life",
+    "source_text": "Many students make study plans in January, but only a few keep the same routine for more than two months.",
+    "reference_answer": "A lot of learners create study schedules at the start of the year, yet just a small number stick to them for over eight weeks.",
+    "user_output": "",
+    "llm_answer": ""
+  }
+]
