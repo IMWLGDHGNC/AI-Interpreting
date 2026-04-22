@@ -1,6 +1,7 @@
 import re
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Optional
 
 import streamlit as st
@@ -60,3 +61,13 @@ def render_media(url: str) -> None:
             st.audio(url)
 
     st.markdown(f"[打开原始媒体链接]({url})")
+
+
+def render_local_audio(audio_path: str | Path) -> None:
+    path = Path(audio_path)
+    if not path.exists():
+        st.warning(f"音频文件不存在：{path}")
+        return
+
+    st.audio(str(path))
+    st.caption(f"音频文件：{path.name}")

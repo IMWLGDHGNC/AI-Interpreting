@@ -14,13 +14,14 @@ from interpreting_app.llm import normalize_api_key, sanitize_error, test_text_mo
 
 def render_sidebar() -> Dict:
     st.sidebar.header("模型配置")
-    st.sidebar.caption("文本任务：DeepSeek；语音转写：SiliconFlow")
+    st.sidebar.caption("翻译任务：DeepSeek；语音转写：SiliconFlow")
 
-    st.sidebar.subheader("文本模型（DeepSeek）")
+    st.sidebar.subheader("翻译模型（DeepSeek）")
     deepseek_api_key = st.sidebar.text_input(
         "DeepSeek API Key",
         type="password",
         help="用于文本翻译与源语重述",
+
     )
     deepseek_base_url = st.sidebar.text_input("DeepSeek Base URL", value=DEEPSEEK_BASE_URL)
     deepseek_model = st.sidebar.text_input("DeepSeek Model", value=DEEPSEEK_TEXT_MODEL)
@@ -31,11 +32,10 @@ def render_sidebar() -> Dict:
         type="password",
         help="必须填写 key，系统不会硬编码密钥",
     )
-    st.sidebar.caption("安全提示：不要把 API Key 写入代码或提交到仓库。")
     stt_endpoint = st.sidebar.text_input("语音转写 Endpoint", value=SILICON_STT_ENDPOINT)
     stt_model = st.sidebar.text_input("语音转写模型", value=SILICON_STT_MODEL)
 
-    if st.sidebar.button("测试文本模型连通性", use_container_width=True):
+    if st.sidebar.button("测试翻译模型连通性", use_container_width=True):
         try:
             reply = test_text_model(
                 api_key=normalize_api_key(deepseek_api_key),
@@ -95,4 +95,14 @@ def render_history_panel(records: List[Dict]) -> None:
             st.write(f"源语：{record.get('source_text', '')}")
             st.write(f"参考答案：{record.get('reference_answer', '')}")
             if record.get("llm_answer"):
-                st.write(f"大模型答案：{record['llm_answer']}")
+                st.write(f"{record.get('model_name', 'unknown model')}答案：{record['llm_answer']}")
+            else:
+                st.write("未生成模型答案。")
+        if record.get("user_source", False):
+            with st.expander(
+                f"{record['time']} | {record['mode']} | {record['name']}"):
+                st.write(f"源语：{record.get('source_text', '')}")
+                if record.get("llm_answer"):
+                    st.write(f"{record.get('model_name', 'unknown model')}答案：{record['llm_answer']}")
+                else:
+                    st.write("未生成模型答案。")

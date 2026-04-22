@@ -1,1 +1,35 @@
-.vscode
+# OS / Editor
+.DS_Store
+**/.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Streamlit / secrets
+.streamlit/secrets.toml
+.env
+.env.*
+
+# Local runtime outputs
+data/mp3/
+storage/history.json
+
+# Third-party spider local sensitive file (contains cookie)
+third_party/Spider-for-Bilibili/headers_test.py
+third_party/Spider-for-Bilibili/test_cookie_response.json

@@ -1,12 +1,14 @@
 [
   {
-    "time": "2026-04-18 00:00:19",
-    "mode": "源语重述",
+    "time": "2026-04-18 01:04:34",
+    "mode": "双语转换",
+    "user_source": false,
+    "model_name": "FunAudioLLM/SenseVoiceSmall",
     "difficulty": "初级",
-    "material_id": "pa_beg_en_001",
-    "topic": "daily life",
-    "source_text": "Many students make study plans in January, but only a few keep the same routine for more than two months.",
-    "reference_answer": "A lot of learners create study schedules at the start of the year, yet just a small number stick to them for over eight weeks.",
+    "material_id": "tr_beg_zh2en_001",
+    "topic": "叙事",
+    "source_text": "上周末我和同学去做志愿活动。虽然很累，但我们帮助了很多老人，也学会了更好地与人沟通。",
+    "reference_answer": "Last weekend, my classmates and I took part in volunteer work. Although it was tiring, we helped many elderly people and learned to communicate better with others.",
     "user_output": "",
     "llm_answer": ""
   }

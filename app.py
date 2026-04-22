@@ -7,6 +7,11 @@ from interpreting_app.config import (
     DIFFICULTY_OPTIONS,
     MODE_OPTIONS,
     TRANSLATION_DIRECTION_OPTIONS,
+    SILICON_STT_MODEL,
+    DEEPSEEK_TEXT_MODEL,
+    NEWS_URL,
+    MP3_PATH,
+    CLASS
 )
 from interpreting_app.llm import (
     generate_llm_answer,
@@ -15,7 +20,7 @@ from interpreting_app.llm import (
     sanitize_error,
     translate_text,
 )
-from interpreting_app.media import render_media
+from interpreting_app.media import render_local_audio, render_media
 from interpreting_app.repository import (
     append_history,
     ensure_storage,
@@ -24,6 +29,39 @@ from interpreting_app.repository import (
     select_material,
 )
 from interpreting_app.ui import render_history_panel, render_sidebar
+import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SPIDER_DIR = PROJECT_ROOT / "third_party" / "Spider-for-Bilibili"
+if SPIDER_DIR.exists() and str(SPIDER_DIR) not in sys.path:
+    sys.path.insert(0, str(SPIDER_DIR))
+
+from get_download import (  # type: ignore[import-not-found]
+    download_subtitle,
+    download_video,
+    get_response,
+    get_subtitle_info,
+    get_video_audio_info,
+)
+from headers_test import get_headers  # type: ignore[import-not-found]
+
+def pull_url(url: str) -> str:
+    tuple_1 = get_headers()
+    response = get_response(url=url, cookies=tuple_1[0], headers=tuple_1[1])
+    st.write("原链接:", url)
+    info_tuple = get_video_audio_info(response)
+    audio_name = info_tuple[2] + ".mp3"
+    audio_path = MP3_PATH / audio_name
+    if audio_path.exists():
+        st.write("音频已存在，直接播放")
+    else:
+        download_video(info_tuple)
+        st.write("视频下载完成")
+    render_local_audio(audio_path)
+    return audio_name
+
 
 
 def sanitize_with_keys(exc: Exception, keys: list[str]) -> str:
@@ -43,92 +81,73 @@ def main() -> None:
     
 
     ensure_storage()
-    materials = load_materials()
     model_cfg = render_sidebar()
-
+    used = st.session_state.setdefault("used", {"news": [0] * len(NEWS_URL)})
     top_left, top_right = st.columns([3, 1])
-    with top_right:
-        if st.button("打开历史记录", use_container_width=True,):
-            st.session_state["show_history"] = True
 
-    if st.session_state.get("show_history"):
+    if st.session_state.get("show_history",False):
         render_history_panel(load_history())
         if st.button("关闭历史记录"):
             st.session_state["show_history"] = False
         st.divider()
 
-    tab_train, tab_upload = top_left.tabs(["素材训练", "上传音频训练"])
+    tab_train, tab_upload = top_left.tabs(["随机素材训练", "上传音频训练"])
 
     with tab_train:
-        mode = st.selectbox("选择功能", MODE_OPTIONS)
-        difficulty = st.selectbox("选择难度", DIFFICULTY_OPTIONS)
+        material_type = st.selectbox("素材类别", CLASS)
 
         if st.button("加载新素材", type="primary"):
-            picked = select_material(materials, mode, difficulty)
-            st.session_state["current_material"] = picked
-            st.session_state["llm_answer"] = ""
-
-        current = st.session_state.get("current_material")
-        if not current:
-            st.info("请先选择功能和难度，再点击“加载新素材”。")
-        else:
-            st.subheader("当前训练素材")
-            st.write(f"题目编号：{current['id']}")
-            st.write(f"来源：{current.get('source', '-')}")
-            st.write(f"主题：{current.get('topic', '-')}")
-            st.write(f"语速提示：{current.get('speed_hint', '-')}")
-
-            if current.get("audio_url"):
-                render_media(current["audio_url"])
-
-            user_note = st.text_area("你的口译/重述输出（仅自我记录）", height=140)
-            c1, c2, c3 = st.columns(3)
-
-            with c1:
-                if st.button("查看原文与参考答案", use_container_width=True):
-                    st.markdown("### 原文")
-                    st.write(current["source_text"])
-                    st.markdown("### 参考答案")
-                    st.write(current["reference_answer"])
-
-            with c2:
-                if st.button("调用大模型生成参考", use_container_width=True):
-                    try:
-                        llm_answer = generate_llm_answer(
-                            api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
-                            model=model_cfg["deepseek_model"],
-                            base_url=model_cfg["deepseek_base_url"],
-                            mode=mode,
-                            material=current,
-                        )
-                        st.session_state["llm_answer"] = llm_answer
-                        st.success("模型调用成功。")
-                    except Exception as exc:
-                        st.error(
-                            f"模型调用失败：{sanitize_with_keys(exc, [model_cfg['deepseek_api_key']])}"
-                        )
-
-            with c3:
-                if st.button("保存到历史记录", use_container_width=True):
-                    append_history(
-                        {
-                            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "mode": mode,
-                            "difficulty": difficulty,
-                            "material_id": current["id"],
-                            "topic": current.get("topic", ""),
-                            "source_text": current["source_text"],
-                            "reference_answer": current["reference_answer"],
-                            "user_output": user_note,
-                            "llm_answer": st.session_state.get("llm_answer", ""),
-                        }
-                    )
-                    st.success("已保存。")
-
-            if st.session_state.get("llm_answer"):
-                st.markdown("### 大模型参考答案")
-                st.write(st.session_state["llm_answer"])
-
+            picked = select_material(material_type, used)
+            if not picked:
+                st.warning("没有更多未使用的素材了，已重置使用状态，将生成用过的素材。")
+                st.session_state["used"] = {"news": [0] * len(NEWS_URL)}
+                picked = select_material(material_type, st.session_state["used"])
+            if picked:
+                st.session_state["current_material"] = picked
+                audio_name = pull_url(picked)
+                audio_path = MP3_PATH / audio_name
+                if audio_path.exists():
+                    st.session_state["train_audio_payload"] = {
+                        "bytes": audio_path.read_bytes(),
+                        "name": audio_name,
+                        "type": "audio/mpeg",
+                    }
+        payload = st.session_state.get("train_audio_payload")
+        if payload and st.button("生成AI答案", type="primary"):
+            st.markdown("### 转写文本")
+            stt_key = normalize_api_key(model_cfg["silicon_api_key"])
+            transcript = transcribe_audio_bytes(
+                api_key=stt_key,
+                endpoint=model_cfg["stt_endpoint"],
+                model=model_cfg["stt_model"],
+                file_bytes=payload["bytes"],
+                filename=payload["name"],
+                mime_type=payload["type"],
+            )
+            st.session_state["uploaded_transcript"] = transcript
+            st.write(transcript)
+            st.markdown("### 翻译")
+            direction = TRANSLATION_DIRECTION_OPTIONS[0]
+            translated = translate_text(
+                api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                base_url=model_cfg["deepseek_base_url"],
+                model=model_cfg["deepseek_model"],
+                text=transcript,
+                direction=direction,
+            )
+            st.write(translated)
+            st.markdown("### 重述")
+            language = "English"
+            paraphrased = paraphrase_text(
+                api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                base_url=model_cfg["deepseek_base_url"],
+                model=model_cfg["deepseek_model"],
+                text=transcript,
+                language=language,
+            )
+            st.session_state["paraphrased"] = paraphrased
+            st.write(paraphrased)
+            
     with tab_upload:
         st.subheader("上传音频 -> 语音转文字 -> 翻译/重述")
         uploaded = st.file_uploader(
@@ -201,6 +220,10 @@ def main() -> None:
                     st.error(f"处理失败：{masked}")
         else:
             st.info("先上传音频后再执行转写/翻译。")
+
+        # if st.button("保存历史记录",use_container_width=True):
+        #     if not st.session_state.get("uploaded_transcript"):
+        #         st.warning("没有转写文本可保存，请先执行转写。")
 
         if st.session_state.get("text_test_reply"):
             st.caption(f"最近一次文本连通性测试返回：{st.session_state['text_test_reply']}")
