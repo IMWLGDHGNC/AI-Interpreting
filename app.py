@@ -14,18 +14,16 @@ from interpreting_app.config import (
     CLASS
 )
 from interpreting_app.llm import (
-    generate_llm_answer,
     normalize_api_key,
     paraphrase_text,
     sanitize_error,
     translate_text,
+    taking_notes_text,
 )
-from interpreting_app.media import render_local_audio, render_media
+from interpreting_app.media import render_local_audio
 from interpreting_app.repository import (
-    append_history,
     ensure_storage,
     load_history,
-    load_materials,
     select_material,
 )
 from interpreting_app.ui import render_history_panel, render_sidebar
@@ -59,7 +57,6 @@ def pull_url(url: str) -> str:
     else:
         download_video(info_tuple)
         st.write("视频下载完成")
-    render_local_audio(audio_path)
     return audio_name
 
 
@@ -75,9 +72,9 @@ def main() -> None:
     st.set_page_config(page_title="AI+口译训练平台", layout="wide")
     st.title("AI+口译训练平台")
     st.markdown("这是一个利用大模型辅助大学生进行英语口译训练的工具，它调用两个模型接口：DeepSeek 生成文本答案，Silicon STT 进行语音转写。")
-    st.markdown("它支持自主选择难度，从素材库中抓取训练素材进行练习；也支持自主上传语音进行练习。")
-    st.markdown("它支持数据的持久化，用户可以保存训练记录并随时查看历史记录。")
-    st.markdown("开发者正在想办法压低成本。")
+    st.markdown("它支持从素材库中抓取训练素材进行练习；也支持自主上传语音进行练习。")
+    st.markdown("大模型可以实现转写、翻译、重述和生成口译笔记的功能。")
+    st.caption("开发者正在想办法压低成本。")
     
 
     ensure_storage()
@@ -91,11 +88,11 @@ def main() -> None:
             st.session_state["show_history"] = False
         st.divider()
 
-    tab_train, tab_upload = top_left.tabs(["随机素材训练", "上传音频训练"])
+    tab_train, tab_upload, tab_notes = top_left.tabs(["随机素材训练", "上传音频训练", "口译笔记训练"])
 
     with tab_train:
         material_type = st.selectbox("素材类别", CLASS)
-
+        st.caption("系统将从素材库中抓取一个英语素材进行训练。")
         if st.button("加载新素材", type="primary"):
             picked = select_material(material_type, used)
             if not picked:
@@ -107,13 +104,25 @@ def main() -> None:
                 audio_name = pull_url(picked)
                 audio_path = MP3_PATH / audio_name
                 if audio_path.exists():
+                    payload_bytes = audio_path.read_bytes()
+                    audio_mime = "audio/mp4" if len(payload_bytes) > 8 and payload_bytes[4:8] == b"ftyp" else "audio/mpeg"
                     st.session_state["train_audio_payload"] = {
-                        "bytes": audio_path.read_bytes(),
+                        "bytes": payload_bytes,
                         "name": audio_name,
-                        "type": "audio/mpeg",
+                        "type": audio_mime,
                     }
+        current_material = st.session_state.get("current_material")
+        if current_material:
+            st.info(f"当前素材：{current_material}")
+
         payload = st.session_state.get("train_audio_payload")
-        if payload and st.button("生成AI答案", type="primary"):
+        if payload:
+            st.markdown("### 训练音频")
+            st.audio(payload["bytes"], format=payload.get("type", "audio/mpeg"))
+            st.caption(f"文件：{payload.get('name', 'unknown')}")
+
+        if payload and st.button("Magic Button", type="primary"):
+            st.caption("伟大的大模型将一站式处理转写+翻译+源语重述+口译笔记，坐享其成吧～")
             st.markdown("### 转写文本")
             stt_key = normalize_api_key(model_cfg["silicon_api_key"])
             transcript = transcribe_audio_bytes(
@@ -147,9 +156,19 @@ def main() -> None:
             )
             st.session_state["paraphrased"] = paraphrased
             st.write(paraphrased)
-            
+            st.markdown("### 生成口译笔记")
+            language = "English"
+            notes = taking_notes_text(
+                api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                base_url=model_cfg["deepseek_base_url"],
+                model=model_cfg["deepseek_model"],
+                text=transcript,
+                language=language,
+            )
+            st.write(notes)
+
     with tab_upload:
-        st.subheader("上传音频 -> 语音转文字 -> 翻译/重述")
+        st.subheader("上传音频 -> 语音转文字 -> 翻译/重述/口译笔记")
         uploaded = st.file_uploader(
             "上传音频文件（支持 mp3/wav/m4a/mp4）",
             type=["mp3", "wav", "m4a", "mp4"],
@@ -166,7 +185,7 @@ def main() -> None:
             st.audio(file_bytes)
 
             direction = st.selectbox("翻译方向", TRANSLATION_DIRECTION_OPTIONS)
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
 
             with col1:
                 run_stt = st.button("1) 仅转写")
@@ -174,8 +193,10 @@ def main() -> None:
                 run_translate = st.button("2) 转写并翻译")
             with col3:
                 run_paraphrase = st.button("3) 转写并重述")
+            with col4:
+                run_notes = st.button("4) 转写并生成口译笔记")
 
-            if run_stt or run_translate or run_paraphrase:
+            if run_stt or run_translate or run_paraphrase or run_notes:
                 try:
                     key = normalize_api_key(model_cfg["silicon_api_key"])
                     transcript = transcribe_audio_bytes(
@@ -212,6 +233,18 @@ def main() -> None:
                         )
                         st.markdown("### 重述结果")
                         st.write(paraphrased)
+                    
+                    if run_notes:
+                        language = "English" if direction == "英文 -> 中文" else "中文"
+                        notes = taking_notes_text(
+                            api_key=normalize_api_key(model_cfg["deepseek_api_key"]),
+                            base_url=model_cfg["deepseek_base_url"],
+                            model=model_cfg["deepseek_model"],
+                            text=transcript,
+                            language=language,
+                        )
+                        st.markdown("### 口译笔记")
+                        st.write(notes)
                 except Exception as exc:
                     masked = sanitize_with_keys(
                         exc,

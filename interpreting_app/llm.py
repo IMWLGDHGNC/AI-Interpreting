@@ -101,44 +101,43 @@ def paraphrase_text(api_key: str, base_url: str, model: str, text: str, language
         user_prompt=user_prompt,
     )
 
+def taking_notes_text(api_key: str, base_url: str, model: str, text: str, language: str) -> str:
+    user_prompt = (
+        "请就所听到的内容生成适合职业口译员使用的中英口译笔记，\n"
+        "笔记应遵循四个原则：\n"
+        "1）尽量少记\n"
+        "2）只记关键词，逻辑关系，容易遗忘的数字和专有名词\n"
+        "3）中英并用，以快为准\n"
+        "4）多用符号和缩略式\n"  
+        "举个例子，如果听到:\n"
+        "Researchers found that most young netizens still aspire to be in a romantic relationship, and only a few expressed no intention.But young netizen's willingness to get married is much lower than their willingness to fall in love Staistics show that compared to young netizens with a middle school or high school degree, those with a bachelor's or master's degree are more willing to get involved in a romantic relationship and get married, on the one hand, young people hold high expectations for relationships, because being in a relationship not only fits the worldly definition of success, but is also the first option for young people when they feel,Lonely and crave company On the other hand, marriageage means more responsibility, a heavier financial burden and stricter social discipline, the fact that many parents forbid their children from engaging in relationships in primary and secondary school, also Rob's young people of opportunities to communicate with the opposite sex, making it difficult for them to effectively establish intimate relationships when they grow up.\n"
+        "返回如下内容：\n"
+        "Res\n"
+        "青网：most 恋，few 无\n"
+        "恋≫婚\n"
+        "edu："
+        "初高中↓｜本硕↑"
+        "恋：高预期｜世俗success｜解lone"
+        "婚：resp↑｜$重｜社束严"
+        "小中学：家长禁早恋"
+        "→异性交少→难intimate rel"      
+        f"语言：{language}\n"
+        f"原文：{text}"
+    )
+    return call_text_chat(
+        api_key=api_key,
+        base_url=base_url,
+        model=model,
+        system_prompt="你是专业口译训练师，擅长生成口译笔记。",
+        user_prompt=user_prompt,
+    )
 
 def test_text_model(api_key: str, base_url: str, model: str) -> str:
+    """测试文本模型是否可用，返回模型回复的内容"""
     return call_text_chat(
         api_key=api_key,
         base_url=base_url,
         model=model,
         system_prompt="你是一个有用的助手。",
         user_prompt="请只回复ok",
-    )
-
-
-def generate_llm_answer(
-    api_key: str,
-    model: str,
-    base_url: str,
-    mode: str,
-    material: Dict,
-) -> str:
-    if not base_url.strip():
-        raise ValueError("DeepSeek Base URL 不能为空。")
-    if not model.strip():
-        raise ValueError("DeepSeek Model 不能为空。")
-
-    text = material["source_text"]
-    if mode == "双语转换":
-        return translate_text(
-            api_key=api_key,
-            base_url=base_url.strip(),
-            model=model.strip(),
-            text=text,
-            direction=material["direction"],
-        )
-
-    language = material.get("language", "中文")
-    return paraphrase_text(
-        api_key=api_key,
-        base_url=base_url.strip(),
-        model=model.strip(),
-        text=text,
-        language=language,
     )

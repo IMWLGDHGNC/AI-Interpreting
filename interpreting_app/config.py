@@ -8,7 +8,7 @@ SPIDER_PATH = BASE_DIR / "third_party" / "Spider-for-Bilibili"
 
 MODE_OPTIONS = ["双语转换", "源语重述"]
 DIFFICULTY_OPTIONS = ["初级", "中级", "高级"]
-CLASS = ["news"]
+CLASS = ["news", "daily English"]
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEEPSEEK_TEXT_MODEL = "deepseek-chat"
@@ -32,3 +32,5 @@ NEWS_URL = [
     "https://www.bilibili.com/video/BV1zn4y1X76t",
     "https://www.bilibili.com/video/BV1cw4m1e7y6"
 ]
+
+DAILY_ENGLISH_URL = []

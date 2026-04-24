@@ -1,73 +1,34 @@
-import re
-import urllib.error
-import urllib.request
 from pathlib import Path
-from typing import Optional
+from typing import Tuple
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 
-@st.cache_data(show_spinner=False)
-def fetch_media_bytes(url: str) -> bytes:
-    req = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/537.36",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=18) as resp:
-        return resp.read()
+def detect_audio_mime(payload: bytes, suffix: str) -> str:
+    # B站下载的音轨常是 MP4 容器（m4s/m4a），即使文件名被写成 .mp3。
+    if len(payload) > 8 and payload[4:8] == b"ftyp":
+        return "audio/mp4"
+    if suffix in {".wav"}:
+        return "audio/wav"
+    return "audio/mpeg"
 
 
-def parse_bilibili_embed(url: str) -> Optional[str]:
-    if "bilibili.com/video/" not in url:
-        return None
+def load_audio_payload(audio_path: str | Path) -> Tuple[bytes, str, str]:
+    path = Path(audio_path)
+    if not path.exists():
+        raise FileNotFoundError(f"音频文件不存在：{path}")
 
-    match = re.search(r"BV[0-9A-Za-z]+", url)
-    if not match:
-        return None
-
-    bvid = match.group(0)
-    return f"https://player.bilibili.com/player.html?bvid={bvid}&page=1"
-
-
-def render_media(url: str) -> None:
-    if not url:
-        st.warning("当前素材没有音频链接。")
-        return
-
-    embed_url = parse_bilibili_embed(url)
-    if embed_url:
-        components.iframe(embed_url, height=460, scrolling=False)
-        st.markdown(f"[打开原始媒体链接]({url})")
-        return
-
-    lower = url.lower()
-    is_video = lower.endswith(".mp4") or "ted.com/talks/" in lower
-
-    try:
-        media_bytes = fetch_media_bytes(url)
-        if is_video:
-            st.video(media_bytes)
-        else:
-            st.audio(media_bytes)
-        st.caption("若播放卡顿，可点击下方原始链接在新标签页打开。")
-    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-        st.warning(f"媒体加载失败：{exc}")
-        if is_video:
-            st.video(url)
-        else:
-            st.audio(url)
-
-    st.markdown(f"[打开原始媒体链接]({url})")
+    payload = path.read_bytes()
+    mime = detect_audio_mime(payload, path.suffix.lower())
+    return payload, mime, path.name
 
 
 def render_local_audio(audio_path: str | Path) -> None:
-    path = Path(audio_path)
-    if not path.exists():
-        st.warning(f"音频文件不存在：{path}")
+    try:
+        payload, mime, name = load_audio_payload(audio_path)
+    except FileNotFoundError as exc:
+        st.warning(str(exc))
         return
 
-    st.audio(str(path))
-    st.caption(f"音频文件：{path.name}")
+    st.audio(payload, format=mime)
+    st.caption(f"音频文件：{name} | 格式：{mime}")

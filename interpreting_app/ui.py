@@ -21,7 +21,6 @@ def render_sidebar() -> Dict:
         "DeepSeek API Key",
         type="password",
         help="用于文本翻译与源语重述",
-
     )
     deepseek_base_url = st.sidebar.text_input("DeepSeek Base URL", value=DEEPSEEK_BASE_URL)
     deepseek_model = st.sidebar.text_input("DeepSeek Model", value=DEEPSEEK_TEXT_MODEL)
