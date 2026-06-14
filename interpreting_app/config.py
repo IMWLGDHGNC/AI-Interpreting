@@ -33,4 +33,23 @@ NEWS_URL = [
     "https://www.bilibili.com/video/BV1cw4m1e7y6"
 ]
 
-DAILY_ENGLISH_URL = []
+DAILY_ENGLISH_URL = [
+    # 朗文场景英语系列 —— 日常生活场景，每集3-8分钟，四步跟读训练法
+    "https://www.bilibili.com/video/BV1FNDaYtEmA",   # Returning Home 回家
+    "https://www.bilibili.com/video/BV1jYDJYSEJ6",   # Walking Somewhere 步行
+    "https://www.bilibili.com/video/BV1yKDiYGEwU",   # Making a Salad 做沙拉
+    "https://www.bilibili.com/video/BV1r3UYYsEAX",   # Going to Bed 上床睡觉
+    "https://www.bilibili.com/video/BV1mA1NYLEGP",   # Brushing Teeth 刷牙剔牙
+    "https://www.bilibili.com/video/BV1WWSSY5Emw",   # Driving Along 开车
+    # 场景训练合集 & 口语专项
+    "https://www.bilibili.com/video/BV1jR4y1F7jK",   # 朗文场景英语·训练版合集（61集）
+    "https://www.bilibili.com/video/BV19zWmzeE5n",   # 50句超高频英语口语 场景对话
+    "https://www.bilibili.com/video/BV1KR4y187Sf",   # 30天听力飞跃之旅（初/中/高级）
+    "https://www.bilibili.com/video/BV1Ni4y1k7sm",   # 场景跟读训练版（跟读·训练版）
+]
+
+# 类别名 -> URL 列表的统一注册表，select_material 会从这里取素材
+MATERIAL_URLS = {
+    "news": NEWS_URL,
+    "daily English": DAILY_ENGLISH_URL,
+}
