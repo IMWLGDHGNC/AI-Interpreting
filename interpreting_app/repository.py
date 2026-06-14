@@ -2,7 +2,7 @@ import json
 import random
 from typing import Dict, List, Optional
 
-from interpreting_app.config import HISTORY_PATH, MATERIALS_PATH, SPIDER_PATH, NEWS_URL
+from interpreting_app.config import HISTORY_PATH, MATERIALS_PATH, MATERIAL_URLS, SPIDER_PATH
 
 
 def ensure_storage() -> None:
@@ -37,23 +37,39 @@ def append_history(entry: Dict) -> None:
 
 
 def select_material(
-    material_type:str,
+    material_type: str,
     used: Optional[Dict[str, List[int]]] = None
-) -> Optional[Dict]:
-    candidates = NEWS_URL.copy() if material_type == "news" else []
-    if not candidates:
-        return None
+) -> Optional[str]:
+    """从指定类别随机选一个未用过的素材 URL。
+
+    返回值含义：
+    - 正常 URL 字符串：选中成功
+    - ``None``：该类别没有配置任何素材
+    - ``""``（空字符串）：该类别素材已全部用完
+    """
+    url_list = MATERIAL_URLS.get(material_type, [])
+    if not url_list:
+        return None  # 该类别没有任何素材
+
+    candidates = url_list.copy()
     if used is not None:
         used_flags = used.get(material_type, [])
-        for index, url in enumerate(candidates):
-            if index < len(used_flags) and used_flags[index] == 1:
-                candidates.remove(url)
+        # 安全移除已用项（倒序遍历避免索引偏移）
+        for index in sorted(
+            [i for i in range(min(len(candidates), len(used_flags)))
+             if used_flags[i] == 1],
+            reverse=True,
+        ):
+            if index < len(candidates):
+                candidates.pop(index)
+
     if not candidates:
-        return None
-    picked = random.choice(candidates) if candidates else None
+        return ""  # 全部用完
+
+    picked = random.choice(candidates)
     if picked and used is not None:
-        index = NEWS_URL.index(picked)
-        used.setdefault(material_type, [0] * len(NEWS_URL))
+        index = url_list.index(picked)
+        used.setdefault(material_type, [0] * len(url_list))
         used[material_type][index] = 1
     return picked
 

@@ -10,13 +10,14 @@ from interpreting_app.config import (
     SILICON_STT_MODEL,
 )
 from interpreting_app.llm import normalize_api_key, sanitize_error, test_text_model
+from interpreting_app.style import render_section_header, render_status_badge
 
 
 def render_sidebar() -> Dict:
-    st.sidebar.header("模型配置")
+    st.sidebar.header("⚙️ 模型配置")
     st.sidebar.caption("翻译任务：DeepSeek；语音转写：SiliconFlow")
 
-    st.sidebar.subheader("翻译模型（DeepSeek）")
+    st.sidebar.subheader("🔤 翻译模型（DeepSeek）")
     deepseek_api_key = st.sidebar.text_input(
         "DeepSeek API Key",
         type="password",
@@ -25,7 +26,7 @@ def render_sidebar() -> Dict:
     deepseek_base_url = st.sidebar.text_input("DeepSeek Base URL", value=DEEPSEEK_BASE_URL)
     deepseek_model = st.sidebar.text_input("DeepSeek Model", value=DEEPSEEK_TEXT_MODEL)
 
-    st.sidebar.subheader("语音模型（SiliconFlow）")
+    st.sidebar.subheader("🎤 语音模型（SiliconFlow）")
     api_key = st.sidebar.text_input(
         "SiliconFlow API Key",
         type="password",
@@ -42,14 +43,14 @@ def render_sidebar() -> Dict:
                 model=deepseek_model.strip(),
             )
             st.session_state["text_test_reply"] = reply
-            st.sidebar.success("模型连通性正常。")
+            st.sidebar.success("✅ 模型连通性正常。")
         except Exception as exc:
-            st.sidebar.error(f"连通性测试失败：{sanitize_error(exc, deepseek_api_key)}")
+            st.sidebar.error(f"❌ 连通性测试失败：{sanitize_error(exc, deepseek_api_key)}")
 
     if st.sidebar.button("测试语音模型连通性", use_container_width=True):
         uploaded = st.session_state.get("uploaded_audio_for_test")
         if not uploaded:
-            st.sidebar.warning("请先在主界面上传一个音频文件，再测试语音模型。")
+            st.sidebar.warning("⚠️ 请先在主界面上传一个音频文件，再测试语音模型。")
         else:
             try:
                 transcript = transcribe_audio_bytes(
@@ -59,14 +60,15 @@ def render_sidebar() -> Dict:
                     file_bytes=uploaded["bytes"],
                     filename=uploaded["name"],
                     mime_type=uploaded.get("type"),
+                    language=None,  # 连通性测试：自动检测语言
                 )
                 st.session_state["stt_test_reply"] = transcript
-                st.sidebar.success("语音模型连通性正常。")
+                st.sidebar.success("✅ 语音模型连通性正常。")
             except Exception as exc:
-                st.sidebar.error(f"语音连通性测试失败：{sanitize_error(exc, api_key)}")
+                st.sidebar.error(f"❌ 语音连通性测试失败：{sanitize_error(exc, api_key)}")
 
     st.sidebar.divider()
-    st.sidebar.caption("历史记录")
+    st.sidebar.markdown("#### 📋 历史记录")
     if st.sidebar.button("查看历史记录", use_container_width=True):
         st.session_state["show_history"] = True
 
@@ -81,7 +83,7 @@ def render_sidebar() -> Dict:
 
 
 def render_history_panel(records: List[Dict]) -> None:
-    st.subheader("训练历史")
+    render_section_header("📋", "训练历史")
     if not records:
         st.info("暂无历史记录。")
         return
